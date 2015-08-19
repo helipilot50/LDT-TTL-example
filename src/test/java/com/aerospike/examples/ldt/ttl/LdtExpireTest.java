@@ -42,7 +42,7 @@ public class LdtExpireTest {
 
 	@Test
 	public void testLdtExpire() throws Exception {
-		subject.work();
+		subject.expire();
 	}
 
 }
