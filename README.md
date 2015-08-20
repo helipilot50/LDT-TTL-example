@@ -127,7 +127,8 @@ The method `expire()` is very simple. A statement is prepared and passed to the 
 	}
 ```
 The `execute()` method will return almost immediately, and the Scan UDF will run cin batch mode, concurrently on each node in the cluster, invoking the UDF `ldt_helper.expire()` on each record in the set. You can monitor the progress of the scan job using AMC:
-[ScanJob](AMCscan.png)
+
+![ScanJob](AMCscan.png)
 
 The UDF is quite simple, the ssystem time is obtained by `os.time()` and stored in a local variable `currentTime` for comparison to the element TTL. An iterator is used to iterate ove the Large List where each element's `TTL` is compared to the current time. It the TTL is smaller that the curretn time, the element is removed from the list.
 ```lua
