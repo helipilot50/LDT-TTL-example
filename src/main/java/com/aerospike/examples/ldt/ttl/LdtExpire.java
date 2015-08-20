@@ -112,7 +112,7 @@ public class LdtExpire {
 			
 			LdtExpire as = new LdtExpire(host, port, namespace, set);
 			
-			as.regusterUDF();
+			as.registerUDF();
 			
 			if ( cl.hasOption("d")){
 				as.generateData();
@@ -125,6 +125,7 @@ public class LdtExpire {
 		}
 	}
 	public void generateData() {
+		deleteData();
 		Random rand = new Random();
 		Random colourRand = new Random();
 		for (int recCount = 1; recCount <= TOTAL_RECORDS; recCount++){
@@ -146,16 +147,25 @@ public class LdtExpire {
 				theValue.put("key", "LDT_TTL:"+recCount+":"+subCount);
 				
 				long randomOffset = rand.nextInt(36000); // number between 0 - 10 minutes in seconds
-				long ttlValue = currentTime + randomOffset + 1000;
+				long ttlValue = currentTime/1000 + randomOffset;
 				theValue.put("TTL", ttlValue);
 				theValue.put("colour", color[colourRand.nextInt(color.length)]);
 				llist.add(Value.get(theValue));
 				} catch (AerospikeException e){
-					if (e.getResultCode() != 1402){
+					if (e.getResultCode() != 1402){ //duplicate LDT key
 						throw e;
 					}
 				}
 			}
+		}
+	}
+	public void deleteData() {
+		for (int recCount = 1; recCount <= TOTAL_RECORDS; recCount++){
+			/*
+			 * generate top record
+			 */
+			Key key = new Key(this.namespace, this.set, "LDT_TTL:"+recCount);
+			this.client.delete(null, key);
 		}
 	}
 	/**
@@ -177,14 +187,14 @@ public class LdtExpire {
 		 */
 		Statement stmt = new Statement();
 		stmt.setNamespace(this.namespace);
-		stmt.setSetName(this.namespace);
-		this.client.execute(null, stmt, "ldt_helper", "expire");
+		stmt.setSetName(this.set);
+		this.client.execute(null, stmt, "ldt_helper", "expire", Value.get("list-bin"));
 	}
-	public void regusterUDF() {
+	public void registerUDF() {
 		Node[] nodes = this.client.getNodes();
 		String moduleString = Info.request(nodes[0], "udf-list");
 		if (moduleString.isEmpty()
-				|| !moduleString.contains("as_utility.lua")){ // register the udf module
+				|| !moduleString.contains("ldt_helper.lua")){ // register the udf module
 
 			this.client.register(null, this.getClass().getClassLoader(), 
 					"com/aerospike/examples/ldt/ttl/ldt_helper.lua", 
