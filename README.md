@@ -155,4 +155,6 @@ end
 ```
 You will note that the ccode contains `info` messages commented out. These were used in debugging.
 
-### What is missing
+### What is missing -- Extra Credit
+This example does not show how to `expire` a sub record when you access it and it's TTL is less than the system time. Seeif you can work out how.
+
