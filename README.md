@@ -66,10 +66,49 @@ The Java code is quite simple, in the `main()` method `refisterUDF()` is called 
 Based on the option from the command line the code will either load data or run the expirary.
 
 ```java
-			if ( cl.hasOption("d")){
-				as.generateData();
-			} else {
-				as.expire();
-			}
+	if ( cl.hasOption("d")){
+		as.generateData();
+	} else {
+		as.expire();
+	}
 
 ```
+The `generateData()` method creates 500 "top" records each with a Large List containing 500 elements or sub-records. The large List is stored in the bin named "list-bin". Each element in the Large List is a Map contain, among other things, a TTL.
+```java
+	public void generateData() {
+		deleteData();
+		Random rand = new Random();
+		Random colourRand = new Random();
+		for (int recCount = 1; recCount <= TOTAL_RECORDS; recCount++){
+			/*
+			 * generate top record
+			 */
+			Key key = new Key(this.namespace, this.set, "LDT_TTL:"+recCount);
+			Bin name = new Bin("name", "LDT_TTL:"+recCount);
+			this.client.put(null, key, name);
+			LargeList llist = this.client.getLargeList(null, key, "list-bin");
+			long currentTime = System.currentTimeMillis();
+			
+			for (int subCount = 1; subCount <= SUBS_PER_TOP; subCount++){
+				/*
+				 * generate sub records in a Large List
+				 */
+				try {
+				Map<String, Object> theValue = new HashMap<String, Object>();
+				theValue.put("key", "LDT_TTL:"+recCount+":"+subCount);
+				
+				long randomOffset = rand.nextInt(36000); // number between 0 - 10 minutes in seconds
+				long ttlValue = currentTime/1000 + randomOffset;
+				theValue.put("TTL", ttlValue);
+				theValue.put("colour", color[colourRand.nextInt(color.length)]);
+				llist.add(Value.get(theValue));
+				} catch (AerospikeException e){
+					if (e.getResultCode() != 1402){ //duplicate LDT key
+						throw e;
+					}
+				}
+			}
+		}
+	}
+```
+You can see the calculation to generate the TTL is the current time plus a random offset within the next 10 minutes, expressed in *seconds*
