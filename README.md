@@ -111,4 +111,48 @@ The `generateData()` method creates 500 "top" records each with a Large List con
 		}
 	}
 ```
-You can see the calculation to generate the TTL is the current time plus a random offset within the next 10 minutes, expressed in *seconds*
+You can see the calculation to generate the TTL is the current time plus a random offset within the next 10 minutes, expressed in **seconds**.  I used 10 minutes to limit the time i needed to wait for testing.
+
+The method `expire()` is very simple. A statement is prepared and passed to the `execute()' method along with the UDF module, function and bin name of the LDT.
+```java
+	public void expire() throws Exception {
+		/*
+		 * prepare a statement with namespace and set
+		 * and execute the ldf_helper UDF on each record.
+		 */
+		Statement stmt = new Statement();
+		stmt.setNamespace(this.namespace);
+		stmt.setSetName(this.set);
+		this.client.execute(null, stmt, "ldt_helper", "expire", Value.get("list-bin"));
+	}
+```
+The `execute()` method will return almost immediately, and the Scan UDF will run cin batch mode, concurrently on each node in the cluster, invoking the UDF `ldt_helper.expire()` on each record in the set. You can monitor the progress of the scan job using AMC:
+[ScanJob](AMCscan.png)
+
+The UDF is quite simple, the ssystem time is obtained by `os.time()` and stored in a local variable `currentTime` for comparison to the element TTL. An iterator is used to iterate ove the Large List where each element's `TTL` is compared to the current time. It the TTL is smaller that the curretn time, the element is removed from the list.
+```lua
+local llist = require('ldt/lib_llist');
+local LDT_KEY = "key"
+local LDT_TTL = "TTL"
+
+function expire(rec, binName)
+  local currentTime = os.time()
+  local items = llist.scan(rec, binName)
+  local expiredCount = 0;
+  for element in list.iterator(items) do
+   
+    local ttl = element[LDT_TTL];
+    --info(tostring(ttl).." vs "..tostring(currentTime))
+    if ttl < currentTime then    
+      --info(tostring(element).."..Removed")
+      llist.remove(rec, binName, element)
+      expiredCount = expiredCount + 1
+    end   
+  end
+  --info("Size: "..tostring(llist.size(rec, binName)))
+  --info("Expired "..tostring(expiredCount).." element")
+end
+```
+You will note that the ccode contains `info` messages commented out. These were used in debugging.
+
+### What is missing
