@@ -47,3 +47,29 @@ This will submit a Scan UDF Job on each node in the cluster, executing the suppl
 ```
 
 ##Discussion
+The Java code is quite simple, in the `main()` method `refisterUDF()` is called to register the UDF located on the the class path. This is the code to check if the UDF is registered and register it:
+```java
+	public void registerUDF() {
+		Node[] nodes = this.client.getNodes();
+		String moduleString = Info.request(nodes[0], "udf-list");
+		if (moduleString.isEmpty()
+				|| !moduleString.contains("ldt_helper.lua")){ // register the udf module
+
+			this.client.register(null, this.getClass().getClassLoader(), 
+					"com/aerospike/examples/ldt/ttl/ldt_helper.lua", 
+					"ldt_helper.lua", Language.LUA);
+			
+		}
+	}
+```
+
+Based on the option from the command line the code will either load data or run the expirary.
+
+```java
+			if ( cl.hasOption("d")){
+				as.generateData();
+			} else {
+				as.expire();
+			}
+
+```
